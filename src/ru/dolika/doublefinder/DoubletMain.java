@@ -1,27 +1,24 @@
 package ru.dolika.doublefinder;
 
 import java.io.File;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import javax.swing.JFileChooser;
+import javax.swing.JOptionPane;
 import javax.swing.ProgressMonitor;
 
 public class DoubletMain {
-	static public List<File> roots = Arrays.asList(new File("C:\\"));
-	static public Hashtable<Long, List<ChecksumFile>> duplicateTable = new Hashtable<>();
-	static public List<ChecksumFile> files = Collections
-			.synchronizedList(new ArrayList<ChecksumFile>());
-	static public Path tempPath = new File("D:/temp/").toPath();
-
-	final static public int MIN_SIZE = 2;
 
 	public static void main(String... args) {
+
+		Hashtable<Long, List<ChecksumFile>> duplicateTable = new Hashtable<>();
+		List<File> roots = Arrays.asList(new File("C:\\"));
 
 		JFileChooser chooser = new JFileChooser();
 		chooser.setMultiSelectionEnabled(true);
@@ -30,77 +27,71 @@ public class DoubletMain {
 		if (chooser.getSelectedFile() != null) {
 			roots = Arrays.asList(chooser.getSelectedFiles());
 		}
-		ProgressMonitor p = new ProgressMonitor(null, "Ищем все файлы",
-				"больше " + MIN_SIZE + " байт.", 0, 1);
-		p.setProgress(0);
-
+		System.out.println("Creating flat structure");
+		List<ChecksumFile> files = Collections.synchronizedList(new ArrayList<ChecksumFile>());
 		for (File root : roots)
-			createFlat(files, root, MIN_SIZE);
-
-		p.setProgress(1);
-		p.setMinimum(0);
-		p.setMaximum(files.size());
-
-		p.setNote(
-				"Теперь пора разобраться с ними.\r\nЭто самая трудоёмкая часть, нужно посчитать хэши всех файлов");
+			createFlat(files, root);
+		System.out.println("Now, we're going to sort. That's the hardest thing, beacause we're sorting based on hash");
 
 		{
-			int iterator = 0;
+			AtomicInteger integer = new AtomicInteger();
+			ProgressMonitor monitor = new ProgressMonitor(null, "Ждём", "Распихиавем файлы по хэшам", 0, files.size());
 			for (ChecksumFile f : files) {
-				p.setProgress(iterator++);
-				duplicateTable.putIfAbsent(f.getChecksum().orElse(-1L),
-						new ArrayList<ChecksumFile>());
+				duplicateTable.putIfAbsent(f.getChecksum().orElse(-1L), new ArrayList<ChecksumFile>());
 				duplicateTable.get(f.getChecksum().orElse(-1L)).add(f);
-
+				monitor.setProgress(integer.incrementAndGet());
+				if (monitor.isCanceled())
+					return;
+			}
+			monitor.close();
+		}
+		{
+			List<List<ChecksumFile>> duplicates = duplicateTable
+					.values()
+					.stream()
+					.filter(f -> f.size() > 1)
+					.filter(f -> {
+						if (f.isEmpty())
+							return false;
+						File file = f.get(0).getFile();
+						if (!file.exists())
+							return false;
+						if (file.length() < 500 * 1024)
+							return false;
+						return true;
+					})
+					.collect(Collectors.toList());
+			for (List<ChecksumFile> dup : duplicates) {
+				if (dup != null) {
+					int status = new DealWithIt(dup).showDialog();
+					if (status == JOptionPane.CANCEL_OPTION)
+						break;
+				}
 			}
 		}
-		p.setProgress(files.size());
-		
-		System.out.println("OK. GO");
-		files.forEach(System.out::println);
-		duplicateTable.values().forEach(System.out::println);
-		duplicateTable.values().stream().filter(f -> f.size() > 1)
-				.filter(f -> f.get(0).getFile().exists()).forEach(dup -> {
-					if (dup != null) {
-						new DealWithIt(dup).showDialog();
-					}
-				});
-
 	}
 
-	public static void createFlat(List<ChecksumFile> files, File f,
-			int minsize) {
+	public static void createFlat(List<ChecksumFile> files, File f) {
 		if (f.isDirectory()) {
 			try {
 				for (File item : f.listFiles()) {
-					createFlat(files, item, minsize);
+					if (item.isHidden() || item.getName().startsWith("."))
+						continue;
+					createFlat(files, item);
 				}
 			} catch (NullPointerException e) {
 
 			}
 		} else {
+			try {
+				if (f.isHidden() || f.getName().startsWith("."))
+					return;
 
-			if (f.length() > minsize) {
-				try {
-					files.add(new ChecksumFile(f));
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
+				files.add(new ChecksumFile(f));
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 		}
-
 	}
 
-	public static List<ChecksumFile> findDoubleGroup(ChecksumFile f) {
-		return duplicateTable.values().stream().filter(a -> a.contains(f))
-				.findFirst().orElse(new ArrayList<ChecksumFile>());
-	}
-
-	public static List<ChecksumFile> findInSameDirectory(
-			ChecksumFile selectedValue) {
-		return files.stream()
-				.filter(fil -> fil.getFile().getParentFile()
-						.equals(selectedValue.getFile().getParentFile()))
-				.collect(Collectors.toList());
-	}
 }

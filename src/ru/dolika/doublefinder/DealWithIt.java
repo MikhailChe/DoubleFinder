@@ -24,22 +24,10 @@ public class DealWithIt extends JDialog {
 	 * 
 	 */
 	private static final long serialVersionUID = 821612509658672200L;
-	private int exitStatus = JOptionPane.CLOSED_OPTION;
+	int exitStatus = JOptionPane.CLOSED_OPTION;
 
 	private DealWithIt() {
 		super((Window) null);
-
-		Runnable ok = () -> {
-			exitStatus = JOptionPane.OK_OPTION;
-			setVisible(false);
-			dispose();
-		};
-		Runnable cancel = () -> {
-			exitStatus = JOptionPane.CANCEL_OPTION;
-			setVisible(false);
-			dispose();
-		};
-		setLocationRelativeTo(null);
 		setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
 		getContentPane().setLayout(new BorderLayout(5, 5));
 
@@ -48,107 +36,131 @@ public class DealWithIt extends JDialog {
 		okCancelPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 5, 5));
 
 		JButton okButton = new JButton("OK");
-		okButton.addActionListener((e) -> {
-			ok.run();
+		okButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				DealWithIt.this.exitStatus = JOptionPane.OK_OPTION;
+				setVisible(false);
+				dispose();
+			}
 		});
 		okCancelPanel.add(okButton);
 
 		JButton cancelButton = new JButton("Отмена");
-		cancelButton.addActionListener((e) -> {
-			cancel.run();
+		cancelButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				DealWithIt.this.exitStatus = JOptionPane.CANCEL_OPTION;
+				setVisible(false);
+				dispose();
+			}
 		});
 		okCancelPanel.add(cancelButton);
 
 		JPanel removeButtonsPanel = new JPanel();
 		getContentPane().add(removeButtonsPanel, BorderLayout.WEST);
-		removeButtonsPanel
-				.setLayout(new BoxLayout(removeButtonsPanel, BoxLayout.Y_AXIS));
+		removeButtonsPanel.setLayout(new BoxLayout(removeButtonsPanel, BoxLayout.Y_AXIS));
 
 		JButton removeSelected = new JButton("Удалить выделенные");
 		removeSelected.addActionListener(new ActionListener() {
+			@Override
 			public void actionPerformed(ActionEvent e) {
+				List<ChecksumFile> chs = new ArrayList<>();
+				int[] indc = DealWithIt.this.list.getSelectedIndices();
+				for (int i = 0; i < indc.length; i++) {
+					chs.add(DealWithIt.this.list.getModel().getElementAt(indc[i]));
+				}
 
-				List<ChecksumFile> chs = list.getSelectedValuesList();
+				String namesOfFiles = chs
+						.stream()
+						.map(a -> a.getFile().getAbsolutePath())
+						.collect(Collectors.joining("\r\n"));
+				int option = JOptionPane
+						.showConfirmDialog(DealWithIt.this,
+								"Вы действительно хотите безвозвратно удалить следующие файлы?\r\n" + namesOfFiles,
+								"Удалить файл", JOptionPane.YES_NO_OPTION);
+				if (option == JOptionPane.NO_OPTION)
+					return;
+
 				for (ChecksumFile f : chs) {
 					f.delete();
 					System.out.println("Removing this: " + f);
-					listModel.removeElement(f);
+					DealWithIt.this.listModel.removeElement(f);
 				}
-
 			}
 		});
 		removeButtonsPanel.add(removeSelected);
 
 		JButton removeUnselected = new JButton("Удалить все кроме выделенных");
-		removeUnselected.addActionListener((e) -> {
+		removeUnselected.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				System.out.println("Removing all but selected");
 
-			if (list.getSelectedIndices().length == 1) {
-				List<ChecksumFile> allInDirectory = DoubletMain
-						.findInSameDirectory(list.getSelectedValue());
-				if (allInDirectory.size() > 2) {
-					int request = JOptionPane.showConfirmDialog(DealWithIt.this,
-							"Я тут нашел ещё несколько дубликатов\r\n"
-									+ "в той же самой директории.\r\n"
-									+ "Если хочешь, я могу показать их всех и ты сам выберешь\r\n"
-									+ "все файлы, которые нужно оставить только в этой директории.\r\n"
-									+ "ОК?",
-							"Погоди ка", JOptionPane.YES_NO_CANCEL_OPTION,
-							JOptionPane.QUESTION_MESSAGE);
-					switch (request) {
-					case JOptionPane.YES_OPTION: {
-						JOptionPane.showConfirmDialog(this, "За работу",
-								"ОК, за работу", JOptionPane.OK_OPTION);
-						new DealWithDirectory(allInDirectory, this)
-								.showDialog();
-						ok.run();
-						break;
-					}
-					case JOptionPane.NO_OPTION: {
-						removeUnselected();
-						break;
-					}
-					case JOptionPane.CANCEL_OPTION: {
-						cancel.run();
-					}
-					}
-				} else {
-					removeUnselected();
+				System.out.println("Creating new ArrayList");
+				List<ChecksumFile> chs = new ArrayList<>();
+
+				System.out.println("Creating new IntStream and collecting it to List<Integer>indcs");
+				List<Integer> indcs = IntStream
+						.range(0, DealWithIt.this.listModel.size())
+						.boxed()
+						.collect(Collectors.toList());
+				System.out
+						.println("indcs now looks like this : "
+								+ indcs.stream().map(a -> "" + a).collect(Collectors.joining(", ")));
+
+				System.out.println("Now we're removing indexes that are selected");
+				for (Integer indx : DealWithIt.this.list.getSelectedIndices()) {
+					System.out.println("removing " + indx);
+					indcs.remove(indx);
+				}
+				System.out.println("All done. Now it looks like this:");
+
+				System.out
+						.println("indcs now looks like this : "
+								+ indcs.stream().map(a -> "" + a).collect(Collectors.joining(", ")));
+
+				System.out.println("Now we're going to add appropriate checksumFiles to it");
+				for (Integer idx : indcs) {
+					chs.add(DealWithIt.this.listModel.getElementAt(idx));
+				}
+				chs.stream().forEach(System.out::println);
+
+				System.out.println("Now, we're just removing them. THat's it");
+
+				String namesOfFiles = chs
+						.stream()
+						.map(a -> a.getFile().getAbsolutePath())
+						.collect(Collectors.joining("\r\n"));
+				int option = JOptionPane
+						.showConfirmDialog(DealWithIt.this,
+								"Вы действительно хотите безвозвратно удалить следующие файлы?\r\n" + namesOfFiles,
+								"Удалить файл", JOptionPane.YES_NO_OPTION);
+				if (option == JOptionPane.NO_OPTION)
+					return;
+				for (ChecksumFile f : chs) {
+					f.delete();
+					DealWithIt.this.listModel.removeElement(f);
+					System.out.println("Removing : " + f);
 				}
 			}
 		});
 		removeButtonsPanel.add(removeUnselected);
 
-		list = new JList<>();
-		getContentPane().add(list, BorderLayout.CENTER);
+		this.list = new JList<>();
+		getContentPane().add(this.list, BorderLayout.CENTER);
 
 		setModalityType(ModalityType.TOOLKIT_MODAL);
 		pack();
-
-	}
-
-	private void removeUnselected() {
-		List<ChecksumFile> chs = new ArrayList<>();
-		List<Integer> indcs = IntStream.range(0, listModel.size()).boxed()
-				.collect(Collectors.toList());
-		for (Integer indx : list.getSelectedIndices()) {
-			indcs.remove((Integer) indx);
-		}
-		for (Integer idx : indcs) {
-			chs.add(listModel.getElementAt(idx));
-		}
-		chs.stream().forEach(System.out::println);
-		for (ChecksumFile f : chs) {
-			f.delete();
-			listModel.removeElement(f);
-		}
+		setLocationRelativeTo(null);
 	}
 
 	public DealWithIt(List<ChecksumFile> files) {
 		this();
-		listModel = new DefaultListModel<>();
-		list.setModel(listModel);
+		this.listModel = new DefaultListModel<>();
+		this.list.setModel(this.listModel);
 		for (ChecksumFile f : files) {
-			listModel.addElement(f);
+			this.listModel.addElement(f);
 		}
 		pack();
 	}
@@ -169,10 +181,12 @@ public class DealWithIt extends JDialog {
 		}
 	}
 
-	private JList<ChecksumFile> list;
-	private DefaultListModel<ChecksumFile> listModel;
+	JList<ChecksumFile> list;
+	DefaultListModel<ChecksumFile> listModel;
 
 	public int showDialog() {
+		pack();
+		setLocationRelativeTo(null);
 		setVisible(true);
 		while (isVisible()) {
 			synchronized (this) {

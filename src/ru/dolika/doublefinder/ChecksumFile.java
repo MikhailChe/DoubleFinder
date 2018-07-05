@@ -3,8 +3,6 @@ package ru.dolika.doublefinder;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -22,74 +20,59 @@ public class ChecksumFile {
 	}
 
 	public Optional<Long> getChecksum() {
-		if (checksum == null) {
+		if (this.checksum == null) {
 			try {
 				calculateChecksum();
 			} catch (NoSuchAlgorithmException | IOException e) {
 				e.printStackTrace();
 			}
 		}
-		return Optional.ofNullable(checksum);
+		return Optional.ofNullable(this.checksum);
 	}
 
-	public void calculateChecksum()
-			throws IOException, NoSuchAlgorithmException {
-		if (file.exists()) {
-			FileInputStream fis = new FileInputStream(file);
-			try {
+	public void calculateChecksum() throws IOException, NoSuchAlgorithmException {
+		if (this.file.exists()) {
+			try (FileInputStream fis = new FileInputStream(this.file)) {
 				int computeLength = (1024 * 1024);
-				if (computeLength > file.length()) {
-					computeLength = (int) file.length();
+				if (computeLength > this.file.length()) {
+					computeLength = (int) this.file.length();
 				}
-				byte[] fileBytes = new byte[(int) computeLength];
+				byte[] fileBytes = new byte[computeLength];
 				int dataLength = fis.read(fileBytes);
 				MessageDigest sha = MessageDigest.getInstance("SHA-1");
-				byte[] checksum = sha
-						.digest(Arrays.copyOf(fileBytes, dataLength));
+				byte[] checksum = sha.digest(Arrays.copyOf(fileBytes, dataLength));
 				this.checksum = 0L;
 				for (int i = 0; i < checksum.length; i++) {
 					byte chs = checksum[i];
 					this.checksum += ((long) (chs & 0xFF)) << (2 * i);
 				}
-			} finally {
-				fis.close();
 			}
 		}
 	}
 
 	public File getFile() {
-		return file;
+		return this.file;
 	}
 
 	@Override
 	public String toString() {
-		return file.toString();
+		return this.file.toString();
 	}
 
 	@Override
 	public boolean equals(Object o) {
 		if (o instanceof ChecksumFile) {
 			return this.file.equals(((ChecksumFile) o).file);
-		} else {
-			return this.file.equals(o);
 		}
+		return this.file.equals(o);
 	}
 
 	@Override
 	public int hashCode() {
-		return file.hashCode();
+		return this.file.hashCode();
 	}
 
 	public void delete() {
-		try {
-			DoubletMain.tempPath.toFile().mkdirs();
-			Files.move(file.toPath(),
-					DoubletMain.tempPath.resolve(file.getParentFile().getName()
-							+ "-" + file.getName()),
-					StandardCopyOption.REPLACE_EXISTING);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
+		this.file.delete();
 	}
 }
