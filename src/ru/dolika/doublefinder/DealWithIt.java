@@ -2,7 +2,6 @@ package ru.dolika.doublefinder;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
-import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
@@ -14,6 +13,7 @@ import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JDialog;
+import javax.swing.JFrame;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -26,8 +26,18 @@ public class DealWithIt extends JDialog {
 	private static final long serialVersionUID = 821612509658672200L;
 	int exitStatus = JOptionPane.CLOSED_OPTION;
 
-	private DealWithIt() {
-		super((Window) null);
+	int shureDelete(List<ChecksumFile> chs) {
+
+		String namesOfFiles = chs.stream().map(a -> a.getFile().getAbsolutePath()).collect(Collectors.joining("\r\n"));
+		int option = JOptionPane
+				.showConfirmDialog(DealWithIt.this,
+						"Вы действительно хотите безвозвратно удалить следующие файлы?\r\n" + namesOfFiles,
+						"Удалить файл", JOptionPane.YES_NO_OPTION);
+		return option;
+	}
+
+	private DealWithIt(JFrame owner) {
+		super(owner);
 		setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
 		getContentPane().setLayout(new BorderLayout(5, 5));
 
@@ -46,7 +56,7 @@ public class DealWithIt extends JDialog {
 		});
 		okCancelPanel.add(okButton);
 
-		JButton cancelButton = new JButton("Отмена");
+		JButton cancelButton = new JButton("Закрыть");
 		cancelButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -55,6 +65,7 @@ public class DealWithIt extends JDialog {
 				dispose();
 			}
 		});
+
 		okCancelPanel.add(cancelButton);
 
 		JPanel removeButtonsPanel = new JPanel();
@@ -71,15 +82,7 @@ public class DealWithIt extends JDialog {
 					chs.add(DealWithIt.this.list.getModel().getElementAt(indc[i]));
 				}
 
-				String namesOfFiles = chs
-						.stream()
-						.map(a -> a.getFile().getAbsolutePath())
-						.collect(Collectors.joining("\r\n"));
-				int option = JOptionPane
-						.showConfirmDialog(DealWithIt.this,
-								"Вы действительно хотите безвозвратно удалить следующие файлы?\r\n" + namesOfFiles,
-								"Удалить файл", JOptionPane.YES_NO_OPTION);
-				if (option == JOptionPane.NO_OPTION)
+				if (shureDelete(chs) == JOptionPane.NO_OPTION)
 					return;
 
 				for (ChecksumFile f : chs) {
@@ -128,15 +131,7 @@ public class DealWithIt extends JDialog {
 
 				System.out.println("Now, we're just removing them. THat's it");
 
-				String namesOfFiles = chs
-						.stream()
-						.map(a -> a.getFile().getAbsolutePath())
-						.collect(Collectors.joining("\r\n"));
-				int option = JOptionPane
-						.showConfirmDialog(DealWithIt.this,
-								"Вы действительно хотите безвозвратно удалить следующие файлы?\r\n" + namesOfFiles,
-								"Удалить файл", JOptionPane.YES_NO_OPTION);
-				if (option == JOptionPane.NO_OPTION)
+				if (shureDelete(chs) == JOptionPane.NO_OPTION)
 					return;
 				for (ChecksumFile f : chs) {
 					f.delete();
@@ -149,20 +144,20 @@ public class DealWithIt extends JDialog {
 
 		this.list = new JList<>();
 		getContentPane().add(this.list, BorderLayout.CENTER);
-
-		setModalityType(ModalityType.TOOLKIT_MODAL);
+		// setModalityType(ModalityType.TOOLKIT_MODAL);
 		pack();
 		setLocationRelativeTo(null);
 	}
 
-	public DealWithIt(List<ChecksumFile> files) {
-		this();
+	public DealWithIt(List<ChecksumFile> files, JFrame owner) {
+		this(owner);
 		this.listModel = new DefaultListModel<>();
 		this.list.setModel(this.listModel);
 		for (ChecksumFile f : files) {
 			this.listModel.addElement(f);
 		}
 		pack();
+		setLocationRelativeTo(null);
 	}
 
 	@Override
